@@ -1,0 +1,954 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Révision — Automates &amp; Langages</title>
+<style>
+  html, body { margin: 0; padding: 0; }
+  #root { min-height: 100vh; }
+</style>
+<!-- React + ReactDOM (production) -->
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<!-- Babel pour compiler le JSX dans le navigateur -->
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel" data-presets="react">
+const { useState, useMemo, useEffect } = React;
+
+
+/* ============================================================
+   RÉVISION — AUTOMATES & LANGAGES
+   App de révision pour le DS (sans lemme de l'étoile)
+   ============================================================ */
+
+// ---------- DATA : FLASHCARDS ----------
+const FLASHCARDS = [
+  {
+    cat: "Bases",
+    q: "Qu'est-ce qu'un alphabet ?",
+    a: "Un ensemble fini X. Ses éléments s'appellent des lettres.",
+  },
+  {
+    cat: "Bases",
+    q: "Qu'est-ce qu'un mot sur un alphabet X ?",
+    a: "Une séquence finie de lettres xᵢ prises dans X. Le mot vide ε est aussi un mot (longueur 0).",
+  },
+  {
+    cat: "Bases",
+    q: "Combien y a-t-il de mots de longueur n sur un alphabet de taille k ?",
+    a: "kⁿ mots. (k = taille de l'alphabet, n = longueur cherchée.)",
+  },
+  {
+    cat: "Bases",
+    q: "Combien de mots de longueur ≤ n sur un alphabet de taille k ?",
+    a: "k⁰ + k¹ + ... + kⁿ. C'est une somme géométrique (on n'oublie pas k⁰ = 1 pour le mot vide).",
+  },
+  {
+    cat: "Bases",
+    q: "Qu'est-ce qu'un préfixe d'un mot x ?",
+    a: "Un mot u tel que x = uw avec w ∈ X*. u et w peuvent éventuellement être le mot vide ε.",
+  },
+  {
+    cat: "Langages réguliers",
+    q: "Quand dit-on qu'un langage L est régulier ?",
+    a: "Si on peut le construire à partir des lettres de X et du mot vide ε par une succession finie d'opérations : puissance, concaténation, itéré (étoile), itéré positif, réunion (addition).",
+  },
+  {
+    cat: "Langages réguliers",
+    q: "Quelles sont les opérations qui construisent un langage régulier ?",
+    a: "1) Puissance Lⁿ  2) Concaténation L₁L₂  3) Itéré L* (étoile de Kleene)  4) Itéré positif L⁺  5) Réunion L₁ + L₂.",
+  },
+  {
+    cat: "Langages réguliers",
+    q: "Différence entre L* et L⁺ ?",
+    a: "L* = L⁺ ∪ {ε} : l'étoile inclut le mot vide (0 répétition). L⁺ = au moins une répétition. Donc L* = {ε} + L + L² + L³ + ... et L⁺ = L + L² + L³ + ...",
+  },
+  {
+    cat: "Langages réguliers",
+    q: "Que vaut (a+b)* ?",
+    a: "L'ensemble de TOUS les mots sur l'alphabet {a,b}, y compris le mot vide. C'est X*.",
+  },
+  {
+    cat: "Automate fini",
+    q: "De quoi est constitué un automate fini ?",
+    a: "D'un ensemble fini E d'états, d'un ensemble fini de transitions entre états, d'un (ou plusieurs) état(s) initial(aux) et d'un ensemble d'états finaux.",
+  },
+  {
+    cat: "Automate fini",
+    q: "Quand un mot u est-il reconnu par un automate A ?",
+    a: "Si on peut le lire dans A en partant d'un état initial et en arrivant sur un état final.",
+  },
+  {
+    cat: "Déterminisme",
+    q: "Quelles sont les 3 conditions pour qu'un automate soit déterministe ?",
+    a: "1) Aucun arc n'est étiqueté par le mot vide ε.  2) Il existe un seul état initial.  3) Pour tout état q et toute lettre x ∈ X, il existe au plus un arc étiqueté par x partant de q.",
+  },
+  {
+    cat: "Déterminisme",
+    q: "Comment déterminiser un automate (méthode des sous-ensembles) ?",
+    a: "On part de l'état initial (ou de l'ε-fermeture de l'initial). Pour chaque sous-ensemble d'états et chaque lettre, on calcule l'ensemble des états atteignables. Chaque nouveau sous-ensemble devient un état. Un sous-ensemble est final s'il contient au moins un état final de l'automate de départ.",
+  },
+  {
+    cat: "Déterminisme",
+    q: "Dans la déterminisation, quand un état-ensemble est-il final ?",
+    a: "Dès qu'il contient au moins un état final de l'automate non déterministe d'origine.",
+  },
+  {
+    cat: "Lemme d'Arden",
+    q: "Énoncé du lemme d'Arden ?",
+    a: "L'équation D = aD + b (avec a ne contenant pas ε) a pour solution D = a*b. Plus généralement X = AX + B  ⟹  X = A*B.",
+  },
+  {
+    cat: "Lemme d'Arden",
+    q: "Méthode de résolution par système d'équations ?",
+    a: "1) On écrit une équation Dᵢ par état (Dᵢ = somme des lettre·Dⱼ pour chaque transition i→j, + ε si i est final).  2) On résout par substitution en utilisant Arden (D = aD + b ⟹ D = a*b).  3) L'expression du langage reconnu est D₀ (état initial).",
+  },
+  {
+    cat: "Théorème de Kleene",
+    q: "Construction de la réunion A₁ + A₂ (Kleene) ?",
+    a: "On crée un nouvel état initial unique, relié par ε-transition vers l'entrée de A₁ et vers l'entrée de A₂. Les sorties de A₁ et A₂ vont vers End.",
+  },
+  {
+    cat: "Théorème de Kleene",
+    q: "Construction de la concaténation A₁·A₂ (Kleene) ?",
+    a: "On relie la sortie de A₁ à l'entrée de A₂ par une ε-transition : Start → A₁ →ε→ A₂ → End.",
+  },
+  {
+    cat: "Théorème de Kleene",
+    q: "Construction de l'itéré positif A⁺ (Kleene) ?",
+    a: "Start → A → End, avec une ε-transition retour de la sortie de A vers son entrée (boucle permettant de répéter A au moins une fois).",
+  },
+  {
+    cat: "Théorème de Kleene",
+    q: "Construction de l'étoile A* (Kleene) ?",
+    a: "Comme A⁺ mais on ajoute un chemin ε permettant de sauter complètement A (pour accepter le mot vide). Start →ε→ End directement, et boucle ε autour de A.",
+  },
+  {
+    cat: "Grammaires",
+    q: "Exemple : la règle S → aSb | ε engendre quel langage ?",
+    a: "{ aⁿbⁿ , n ≥ 0 }. Chaque application de S → aSb ajoute un a à gauche et un b à droite ; ε termine la dérivation.",
+  },
+  {
+    cat: "Grammaires",
+    q: "Quelle règle pour engendrer { a²ⁿb²ⁿ , n ≥ 0 } ?",
+    a: "S → aaSbb | ε (on ajoute deux a et deux b à chaque étape).",
+  },
+];
+
+// ---------- DATA : QUIZ (questions de cours / vrai-faux et choix) ----------
+const QUIZ = [
+  {
+    type: "mcq",
+    cat: "Bases",
+    q: "Soit X = {a, b}. Combien y a-t-il de mots de longueur 3 ?",
+    choices: ["6", "8", "9", "3"],
+    correct: 1,
+    explain: "kⁿ = 2³ = 8.",
+  },
+  {
+    type: "mcq",
+    cat: "Bases",
+    q: "Soit X = {a, b, c}. Combien de mots de longueur 3 ?",
+    choices: ["9", "18", "27", "6"],
+    correct: 2,
+    explain: "kⁿ = 3³ = 27.",
+  },
+  {
+    type: "mcq",
+    cat: "Bases",
+    q: "Soit X = {a,b,c}. Nombre de mots de longueur ≤ 3 ?",
+    choices: ["27", "39", "40", "30"],
+    correct: 2,
+    explain: "3⁰ + 3¹ + 3² + 3³ = 1 + 3 + 9 + 27 = 40 (on compte le mot vide).",
+  },
+  {
+    type: "mcq",
+    cat: "Bases",
+    q: "Combien de préfixes possède le mot abaabbaba (9 lettres) ?",
+    choices: ["9", "10", "8", "18"],
+    correct: 1,
+    explain: "Un mot de longueur n a n+1 préfixes (du mot vide ε au mot entier). Ici 9+1 = 10.",
+  },
+  {
+    type: "vf",
+    cat: "Langages réguliers",
+    q: "(a + b)* contient le mot vide ε.",
+    correct: true,
+    explain: "L'étoile inclut toujours ε (0 répétition).",
+  },
+  {
+    type: "vf",
+    cat: "Langages réguliers",
+    q: "L⁺ contient toujours le mot vide.",
+    correct: false,
+    explain: "L⁺ = au moins une répétition. ε n'y est PAS (sauf si ε ∈ L). C'est L* qui contient toujours ε.",
+  },
+  {
+    type: "mcq",
+    cat: "Mots & langages (Ex.4 TD1)",
+    q: "Le mot 'ab' appartient-il au langage a*b* ?",
+    choices: ["Oui", "Non"],
+    correct: 0,
+    explain: "a*b* = (des a) suivis de (des b). 'ab' = un a puis un b ✓.",
+  },
+  {
+    type: "mcq",
+    cat: "Mots & langages (Ex.4 TD1)",
+    q: "Le mot 'ba' appartient-il au langage a*b* ?",
+    choices: ["Oui", "Non"],
+    correct: 1,
+    explain: "Dans a*b* les a viennent AVANT les b. 'ba' a un b avant un a → refusé.",
+  },
+  {
+    type: "mcq",
+    cat: "Mots & langages (Ex.4 TD1)",
+    q: "Le mot 'baba' appartient-il à (a+b)³ ?",
+    choices: ["Oui", "Non"],
+    correct: 1,
+    explain: "(a+b)³ = mots de longueur exactement 3. 'baba' a 4 lettres → non.",
+  },
+  {
+    type: "mcq",
+    cat: "Mots & langages (Ex.4 TD1)",
+    q: "Le mot vide ε appartient-il à (a + b + ε)³ ?",
+    choices: ["Oui", "Non"],
+    correct: 0,
+    explain: "Comme ε est une option à chaque facteur, ε·ε·ε = ε est bien dans le langage.",
+  },
+  {
+    type: "vf",
+    cat: "Déterminisme",
+    q: "Un automate avec deux états initiaux peut être déterministe.",
+    correct: false,
+    explain: "Un automate déterministe a EXACTEMENT un état initial.",
+  },
+  {
+    type: "vf",
+    cat: "Déterminisme",
+    q: "Un automate déterministe peut contenir des ε-transitions.",
+    correct: false,
+    explain: "Aucun arc ne doit être étiqueté par ε dans un automate déterministe.",
+  },
+  {
+    type: "vf",
+    cat: "Déterminisme",
+    q: "Dans un automate déterministe, un état peut avoir deux transitions sortantes étiquetées 'a'.",
+    correct: false,
+    explain: "Au plus UN arc par lettre et par état. Deux arcs 'a' sortant du même état = non déterministe.",
+  },
+  {
+    type: "mcq",
+    cat: "Lemme d'Arden",
+    q: "Solution de l'équation D = aD + b ?",
+    choices: ["D = a*b", "D = ab*", "D = (ab)*", "D = a+b"],
+    correct: 0,
+    explain: "Lemme d'Arden : D = aD + b ⟹ D = a*b.",
+  },
+  {
+    type: "mcq",
+    cat: "Lemme d'Arden",
+    q: "Solution de X = (a+b)X + ε ?",
+    choices: ["(a+b)*", "(a+b)⁺", "ε", "a*b*"],
+    correct: 0,
+    explain: "X = AX + B ⟹ X = A*B. Ici A = (a+b), B = ε, donc X = (a+b)*ε = (a+b)*.",
+  },
+  {
+    type: "mcq",
+    cat: "Grammaires (TD4)",
+    q: "Quelle règle engendre { aⁿbⁿ , n ≥ 0 } ?",
+    choices: ["S → aSb | ε", "S → aS | b", "S → Sab | ε", "S → ab | ε"],
+    correct: 0,
+    explain: "S → aSb ajoute symétriquement un a à gauche et un b à droite ; ε arrête.",
+  },
+  {
+    type: "mcq",
+    cat: "Grammaires (TD4)",
+    q: "Quelle règle engendre { a²ⁿ(bc)³ⁿ , n ≥ 0 } ?",
+    choices: ["S → aaSbcbcbc | ε", "S → aSbc | ε", "S → aabc | ε", "S → aaScbc | ε"],
+    correct: 0,
+    explain: "Il faut 2 a et 3 fois 'bc' à chaque étape : S → aa·S·(bc)(bc)(bc) | ε.",
+  },
+];
+
+// ---------- DATA : SIMULATEUR — mots à tester sur des langages ----------
+// On teste l'appartenance de mots à des langages réguliers décrits par regex JS
+const SIM_LANGS = [
+  {
+    label: "a*b*",
+    desc: "Des a (≥0) suivis de des b (≥0).",
+    regex: /^a*b*$/,
+    tests: ["", "ab", "aabb", "ba", "aaa", "abab"],
+  },
+  {
+    label: "(a+b)*ab",
+    desc: "N'importe quoi sur {a,b}, puis 'ab' à la fin.",
+    regex: /^(a|b)*ab$/,
+    tests: ["ab", "aab", "bbab", "ba", "abab", "abb"],
+  },
+  {
+    label: "(b*a+ab)* aba   [L₁ Ex.19]",
+    desc: "L₁ = (b*a + ab)* aba — finit toujours par 'aba'.",
+    regex: /^((b*a)|(ab))*aba$/,
+    tests: ["aba", "abaaba", "aabab", "baaba", "babbb", "ab"],
+  },
+  {
+    label: "a*bb (a*bb)*  =  (a*bb)+",
+    desc: "L = (a*bb)* — blocs de 'a' suivis de 'bb', répétés.",
+    regex: /^(a*bb)*$/,
+    tests: ["", "bb", "abb", "aabbbb", "abba", "bbbb"],
+  },
+];
+
+// ---------- DATA : EXERCICES DÉTERMINISATION (étapes guidées) ----------
+const DETERM_EX = [
+  {
+    title: "Déterminiser : Start→①, ①--a-->①, ①--a-->③, ①--b-->②, ③--a-->④, ④--a-->④...",
+    nfa: "Automate non déterministe de la fiche (états 1,2,3,4 ; final 2).",
+    steps: [
+      "État de départ : {1}.",
+      "Depuis {1} avec 'a' : 1→1 et 1→3, donc on obtient {1,3}.",
+      "Depuis {1} avec 'b' : 1→2, donc {2} (qui est final car contient 2).",
+      "Depuis {1,3} avec 'a' : 1→{1,3}, 3→{4}, donc {1,3,4}.",
+      "Depuis {1,3} avec 'b' : 1→2, donc {2}.",
+      "On continue jusqu'à ne plus créer de nouvel état-ensemble. Les états contenant 2 sont finaux.",
+    ],
+    answer: "AFD avec états {1}, {1,3}, {1,3,4}, {2}, {1,4}... — finaux = tous ceux contenant l'état 2.",
+  },
+  {
+    title: "Déterminiser : Start→①, ①--a-->② (boucle a sur 1), ①--a-->② , ②--b-->③ ...",
+    nfa: "Ex.25 / Ex.26 type — automate avec une boucle 'a' sur l'état initial.",
+    steps: [
+      "Départ : {1}.",
+      "Depuis {1} avec 'a' : on collecte tous les états atteints par 'a' depuis 1.",
+      "Regrouper en un nouvel état-ensemble (ex. {1,2,3}).",
+      "Recommencer pour chaque lettre et chaque nouvel ensemble.",
+      "Marquer finaux les ensembles contenant un état final d'origine.",
+    ],
+    answer: "L'AFD résultant reconnaît le même langage. Vérifier en testant un mot (ex. baabab).",
+  },
+];
+
+// ---------- DATA : EXERCICES ARDEN (résolution de système) ----------
+const ARDEN_EX = [
+  {
+    title: "Système de la fiche (automate à 3 états, final = état 0)",
+    system: [
+      "D₀ = aD₀ + bD₁ + ε",
+      "D₁ = bD₀ + aD₂",
+      "D₂ = aD₁ + bD₂",
+    ],
+    steps: [
+      "On résout D₂ par Arden : D₂ = aD₁ + bD₂  ⟹  D₂ = b*aD₁.",
+      "On substitue dans D₁ : D₁ = bD₀ + a·(b*aD₁) = bD₀ + ab*a·D₁.",
+      "Arden sur D₁ : D₁ = (ab*a)* bD₀.",
+      "On substitue dans D₀ : D₀ = aD₀ + b·(ab*a)*bD₀ + ε.",
+      "Factoriser : D₀ = (a + b(ab*a)*b) D₀ + ε.",
+      "Arden : D₀ = (a + b(ab*a)*b)* ε = (a + b(ab*a)*b)*.",
+    ],
+    answer: "L = (a + b(ab*a)*b)*",
+  },
+  {
+    title: "Mini-système d'entraînement",
+    system: [
+      "D₀ = aD₀ + bD₁",
+      "D₁ = ε   (état 1 final, pas de transition sortante)",
+    ],
+    steps: [
+      "D₁ = ε.",
+      "D₀ = aD₀ + bD₁ = aD₀ + b·ε = aD₀ + b.",
+      "Arden : D₀ = a*b.",
+    ],
+    answer: "L = a*b",
+  },
+];
+
+// ============================================================
+// STYLES
+// ============================================================
+const FONT_IMPORT =
+  "https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,900&family=Space+Mono:wght@400;700&family=Outfit:wght@300;400;500;600;700&display=swap";
+
+const palette = {
+  ink: "#1a1625",
+  paper: "#f4efe6",
+  cream: "#fbf8f1",
+  rust: "#c8553d",
+  gold: "#e8a02b",
+  teal: "#2a7f7e",
+  plum: "#6b3a6e",
+  line: "#d8cfbf",
+};
+
+const TABS = [
+  { id: "cards", label: "Flashcards" },
+  { id: "quiz", label: "Quiz" },
+  { id: "sim", label: "Mots & langages" },
+  { id: "determ", label: "Déterminisation" },
+  { id: "arden", label: "Arden / Expr. rég." },
+  { id: "memo", label: "Mémo express" },
+];
+
+// ============================================================
+// FLASHCARDS COMPONENT
+// ============================================================
+function Flashcards() {
+  const cats = useMemo(() => ["Toutes", ...Array.from(new Set(FLASHCARDS.map((c) => c.cat)))], []);
+  const [cat, setCat] = useState("Toutes");
+  const deck = useMemo(
+    () => FLASHCARDS.filter((c) => cat === "Toutes" || c.cat === cat),
+    [cat]
+  );
+  const [i, setI] = useState(0);
+  const [flipped, setFlipped] = useState(false);
+  const [known, setKnown] = useState({});
+
+  useEffect(() => {
+    setI(0);
+    setFlipped(false);
+  }, [cat]);
+
+  const card = deck[i];
+  const next = () => {
+    setFlipped(false);
+    setTimeout(() => setI((i + 1) % deck.length), 120);
+  };
+  const prev = () => {
+    setFlipped(false);
+    setTimeout(() => setI((i - 1 + deck.length) % deck.length), 120);
+  };
+  const markKnown = (val) => {
+    setKnown({ ...known, [card.q]: val });
+    next();
+  };
+
+  const knownCount = Object.values(known).filter(Boolean).length;
+
+  return (
+    <div>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 18 }}>
+        {cats.map((c) => (
+          <button
+            key={c}
+            onClick={() => setCat(c)}
+            style={{
+              ...chipStyle,
+              background: cat === c ? palette.ink : "transparent",
+              color: cat === c ? palette.cream : palette.ink,
+              borderColor: palette.ink,
+            }}
+          >
+            {c}
+          </button>
+        ))}
+      </div>
+
+      <div style={{ textAlign: "center", marginBottom: 10, fontFamily: "'Space Mono', monospace", fontSize: 13, color: palette.plum }}>
+        Carte {i + 1} / {deck.length} · connues : {knownCount}
+      </div>
+
+      <div
+        onClick={() => setFlipped(!flipped)}
+        style={{ perspective: 1600, cursor: "pointer", maxWidth: 620, margin: "0 auto" }}
+      >
+        <div
+          style={{
+            position: "relative",
+            height: 340,
+            transition: "transform .55s cubic-bezier(.2,.8,.2,1)",
+            transformStyle: "preserve-3d",
+            transform: flipped ? "rotateY(180deg)" : "rotateY(0deg)",
+          }}
+        >
+          {/* FRONT */}
+          <div style={{ ...cardFace, background: palette.cream, border: `2px solid ${palette.ink}` }}>
+            <div style={faceTag}>{card.cat}</div>
+            <div style={{ fontFamily: "'Fraunces', serif", fontSize: 26, fontWeight: 600, lineHeight: 1.25, color: palette.ink }}>
+              {card.q}
+            </div>
+            <div style={faceHint}>cliquer pour retourner ↻</div>
+          </div>
+          {/* BACK */}
+          <div
+            style={{
+              ...cardFace,
+              transform: "rotateY(180deg)",
+              background: palette.ink,
+              border: `2px solid ${palette.ink}`,
+            }}
+          >
+            <div style={{ ...faceTag, color: palette.gold, borderColor: palette.gold }}>réponse</div>
+            <div style={{ fontFamily: "'Outfit', sans-serif", fontSize: 19, lineHeight: 1.45, color: palette.cream }}>
+              {card.a}
+            </div>
+            <div style={{ ...faceHint, color: "#9a8fb0" }}>cliquer pour retourner ↻</div>
+          </div>
+        </div>
+      </div>
+
+      <div style={{ display: "flex", justifyContent: "center", gap: 10, marginTop: 22, flexWrap: "wrap" }}>
+        <button onClick={prev} style={navBtn}>← Préc.</button>
+        <button onClick={() => markKnown(false)} style={{ ...navBtn, borderColor: palette.rust, color: palette.rust }}>À revoir</button>
+        <button onClick={() => markKnown(true)} style={{ ...navBtn, borderColor: palette.teal, color: palette.teal }}>Acquise ✓</button>
+        <button onClick={next} style={navBtn}>Suiv. →</button>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// QUIZ COMPONENT
+// ============================================================
+function Quiz() {
+  const [order] = useState(() => QUIZ.map((_, idx) => idx));
+  const [i, setI] = useState(0);
+  const [picked, setPicked] = useState(null);
+  const [score, setScore] = useState(0);
+  const [done, setDone] = useState(false);
+  const [answeredCount, setAnsweredCount] = useState(0);
+
+  const q = QUIZ[order[i]];
+  const choices = q.type === "vf" ? ["Vrai", "Faux"] : q.choices;
+  const correctIdx = q.type === "vf" ? (q.correct ? 0 : 1) : q.correct;
+
+  const choose = (idx) => {
+    if (picked !== null) return;
+    setPicked(idx);
+    setAnsweredCount((c) => c + 1);
+    if (idx === correctIdx) setScore((s) => s + 1);
+  };
+  const next = () => {
+    if (i + 1 >= QUIZ.length) {
+      setDone(true);
+      return;
+    }
+    setI(i + 1);
+    setPicked(null);
+  };
+  const restart = () => {
+    setI(0);
+    setPicked(null);
+    setScore(0);
+    setDone(false);
+    setAnsweredCount(0);
+  };
+
+  if (done) {
+    const pct = Math.round((score / QUIZ.length) * 100);
+    return (
+      <div style={{ textAlign: "center", padding: "40px 10px" }}>
+        <div style={{ fontFamily: "'Fraunces', serif", fontSize: 56, fontWeight: 900, color: palette.rust }}>{pct}%</div>
+        <div style={{ fontFamily: "'Outfit', sans-serif", fontSize: 22, marginTop: 6 }}>
+          {score} / {QUIZ.length} bonnes réponses
+        </div>
+        <div style={{ marginTop: 16, fontFamily: "'Outfit'", color: palette.plum, fontSize: 16 }}>
+          {pct >= 80 ? "Solide. Tu es prêt 💪" : pct >= 50 ? "Bon début — refais les flashcards des catégories ratées." : "Reprends le mémo et les flashcards, puis recommence."}
+        </div>
+        <button onClick={restart} style={{ ...navBtn, marginTop: 26 }}>Recommencer</button>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ maxWidth: 640, margin: "0 auto" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", fontFamily: "'Space Mono', monospace", fontSize: 13, color: palette.plum, marginBottom: 14 }}>
+        <span>Q {i + 1}/{QUIZ.length}</span>
+        <span>{q.cat}</span>
+        <span>Score {score}</span>
+      </div>
+
+      <div style={{ height: 6, background: palette.line, borderRadius: 3, marginBottom: 24 }}>
+        <div style={{ height: "100%", width: `${((i) / QUIZ.length) * 100}%`, background: palette.gold, borderRadius: 3, transition: "width .3s" }} />
+      </div>
+
+      <div style={{ fontFamily: "'Fraunces', serif", fontSize: 24, fontWeight: 600, lineHeight: 1.3, marginBottom: 26 }}>
+        {q.q}
+      </div>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        {choices.map((c, idx) => {
+          let bg = palette.cream, bord = palette.ink, col = palette.ink;
+          if (picked !== null) {
+            if (idx === correctIdx) { bg = palette.teal; col = "#fff"; bord = palette.teal; }
+            else if (idx === picked) { bg = palette.rust; col = "#fff"; bord = palette.rust; }
+          }
+          return (
+            <button
+              key={idx}
+              onClick={() => choose(idx)}
+              style={{
+                textAlign: "left", padding: "14px 18px", borderRadius: 12,
+                border: `2px solid ${bord}`, background: bg, color: col,
+                fontFamily: "'Outfit', sans-serif", fontSize: 17, cursor: picked === null ? "pointer" : "default",
+                transition: "all .2s",
+              }}
+            >
+              {c}
+            </button>
+          );
+        })}
+      </div>
+
+      {picked !== null && (
+        <div style={{ marginTop: 20, padding: "14px 18px", background: palette.paper, borderLeft: `4px solid ${palette.gold}`, borderRadius: 8, fontFamily: "'Outfit'", fontSize: 16, lineHeight: 1.45 }}>
+          <strong>{picked === correctIdx ? "✓ Correct. " : "✗ "}</strong>{q.explain}
+        </div>
+      )}
+
+      {picked !== null && (
+        <div style={{ textAlign: "center", marginTop: 22 }}>
+          <button onClick={next} style={navBtn}>{i + 1 >= QUIZ.length ? "Voir le score" : "Suivant →"}</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ============================================================
+// SIMULATEUR MOTS & LANGAGES
+// ============================================================
+function WordSim() {
+  const [li, setLi] = useState(0);
+  const [input, setInput] = useState("");
+  const [result, setResult] = useState(null);
+  const lang = SIM_LANGS[li];
+
+  const test = (w) => {
+    const word = w !== undefined ? w : input;
+    setInput(word);
+    setResult(lang.regex.test(word));
+  };
+
+  useEffect(() => { setResult(null); setInput(""); }, [li]);
+
+  return (
+    <div style={{ maxWidth: 640, margin: "0 auto" }}>
+      <p style={{ fontFamily: "'Outfit'", color: palette.plum, fontSize: 15, marginBottom: 16 }}>
+        Choisis un langage régulier, tape un mot (sur {"{a,b}"}) et vérifie s'il est reconnu. Les boutons proposent des mots-test.
+      </p>
+
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 18 }}>
+        {SIM_LANGS.map((l, idx) => (
+          <button key={idx} onClick={() => setLi(idx)} style={{
+            ...chipStyle, fontFamily: "'Space Mono', monospace",
+            background: li === idx ? palette.plum : "transparent",
+            color: li === idx ? "#fff" : palette.ink, borderColor: palette.plum,
+          }}>
+            {l.label}
+          </button>
+        ))}
+      </div>
+
+      <div style={{ background: palette.cream, border: `2px solid ${palette.ink}`, borderRadius: 14, padding: 22 }}>
+        <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 20, color: palette.rust, marginBottom: 6 }}>{lang.label}</div>
+        <div style={{ fontFamily: "'Outfit'", fontSize: 15, color: palette.ink, marginBottom: 18 }}>{lang.desc}</div>
+
+        <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
+          <input
+            value={input}
+            onChange={(e) => setInput(e.target.value.replace(/[^ab]/g, ""))}
+            placeholder="ex: aabb (mot vide = laisser vide)"
+            style={{ flex: 1, padding: "12px 14px", borderRadius: 10, border: `2px solid ${palette.line}`, fontFamily: "'Space Mono', monospace", fontSize: 16 }}
+          />
+          <button onClick={() => test()} style={{ ...navBtn, margin: 0 }}>Tester</button>
+        </div>
+
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 16 }}>
+          {lang.tests.map((t, idx) => (
+            <button key={idx} onClick={() => test(t)} style={{
+              ...chipStyle, fontFamily: "'Space Mono', monospace", fontSize: 13,
+              background: "transparent", color: palette.teal, borderColor: palette.teal,
+            }}>
+              {t === "" ? "ε" : t}
+            </button>
+          ))}
+        </div>
+
+        {result !== null && (
+          <div style={{
+            padding: "14px 18px", borderRadius: 10, textAlign: "center",
+            fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 600,
+            background: result ? palette.teal : palette.rust, color: "#fff",
+          }}>
+            « {input === "" ? "ε" : input} » {result ? "est reconnu ✓" : "n'est PAS reconnu ✗"}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// EXERCICES À ÉTAPES (déterminisation + Arden partagent le même rendu)
+// ============================================================
+function StepExercise({ data, kind }) {
+  const [ei, setEi] = useState(0);
+  const [revealed, setRevealed] = useState(0);
+  const [showAns, setShowAns] = useState(false);
+  const ex = data[ei];
+
+  const change = (idx) => { setEi(idx); setRevealed(0); setShowAns(false); };
+
+  return (
+    <div style={{ maxWidth: 680, margin: "0 auto" }}>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 18 }}>
+        {data.map((d, idx) => (
+          <button key={idx} onClick={() => change(idx)} style={{
+            ...chipStyle, background: ei === idx ? palette.ink : "transparent",
+            color: ei === idx ? palette.cream : palette.ink, borderColor: palette.ink,
+          }}>
+            Exercice {idx + 1}
+          </button>
+        ))}
+      </div>
+
+      <div style={{ background: palette.cream, border: `2px solid ${palette.ink}`, borderRadius: 14, padding: 24 }}>
+        <div style={{ fontFamily: "'Fraunces', serif", fontSize: 20, fontWeight: 600, lineHeight: 1.3, marginBottom: 8 }}>
+          {ex.title}
+        </div>
+        {ex.nfa && <div style={{ fontFamily: "'Outfit'", fontSize: 14, color: palette.plum, marginBottom: 14 }}>{ex.nfa}</div>}
+
+        {ex.system && (
+          <div style={{ background: palette.ink, color: palette.cream, borderRadius: 10, padding: "16px 18px", marginBottom: 18, fontFamily: "'Space Mono', monospace", fontSize: 16, lineHeight: 1.7 }}>
+            {ex.system.map((s, idx) => <div key={idx}>{s}</div>)}
+          </div>
+        )}
+
+        <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, color: palette.plum, marginBottom: 10, textTransform: "uppercase", letterSpacing: 1 }}>
+          Étapes de résolution
+        </div>
+
+        <ol style={{ paddingLeft: 22, margin: 0 }}>
+          {ex.steps.slice(0, revealed).map((s, idx) => (
+            <li key={idx} style={{ fontFamily: "'Outfit'", fontSize: 16, lineHeight: 1.5, marginBottom: 10, color: palette.ink, animation: "fadein .35s ease" }}>
+              {s}
+            </li>
+          ))}
+        </ol>
+
+        {revealed < ex.steps.length ? (
+          <button onClick={() => setRevealed(revealed + 1)} style={{ ...navBtn, margin: "8px 0 0" }}>
+            Révéler l'étape {revealed + 1} →
+          </button>
+        ) : (
+          <button onClick={() => setShowAns(true)} style={{ ...navBtn, margin: "8px 0 0", borderColor: palette.teal, color: palette.teal }}>
+            Voir la réponse finale ✓
+          </button>
+        )}
+
+        {showAns && (
+          <div style={{ marginTop: 18, padding: "16px 20px", background: palette.teal, color: "#fff", borderRadius: 10, fontFamily: "'Space Mono', monospace", fontSize: 18, lineHeight: 1.5 }}>
+            {ex.answer}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// MÉMO EXPRESS
+// ============================================================
+function Memo() {
+  const blocks = [
+    {
+      title: "Compter les mots",
+      color: palette.rust,
+      items: [
+        "Alphabet de taille k, mots de longueur n  →  kⁿ mots.",
+        "Mots de longueur ≤ n  →  k⁰ + k¹ + … + kⁿ.",
+        "Mot de longueur n  →  n + 1 préfixes (avec ε).",
+      ],
+    },
+    {
+      title: "Opérations régulières",
+      color: palette.gold,
+      items: [
+        "Puissance Lⁿ · Concaténation L₁L₂ · Réunion L₁+L₂.",
+        "Étoile L* = {ε} + L + L² + …  (contient ε).",
+        "Itéré positif L⁺ = L + L² + …  (PAS ε en général).",
+        "(a+b)* = tous les mots sur {a,b}.",
+      ],
+    },
+    {
+      title: "Automate déterministe : 3 conditions",
+      color: palette.teal,
+      items: [
+        "1) Aucun arc étiqueté ε.",
+        "2) Un seul état initial.",
+        "3) Pour chaque état q et chaque lettre x : au plus un arc x sortant.",
+      ],
+    },
+    {
+      title: "Déterminisation (sous-ensembles)",
+      color: palette.plum,
+      items: [
+        "État de départ = {état initial}.",
+        "Nouvel état = ensemble des états atteints par une lettre.",
+        "On itère jusqu'à stabilité.",
+        "Final = tout ensemble contenant un état final d'origine.",
+      ],
+    },
+    {
+      title: "Lemme d'Arden",
+      color: palette.rust,
+      items: [
+        "D = aD + b   ⟹   D = a*b.",
+        "X = AX + B   ⟹   X = A*B   (A sans ε).",
+        "Méthode : une équation Dᵢ par état, +ε si état final, résoudre par substitution.",
+      ],
+    },
+    {
+      title: "Théorème de Kleene (constructions)",
+      color: palette.gold,
+      items: [
+        "Réunion : nouvel init → ε → A₁ et A₂.",
+        "Concaténation : A₁ → ε → A₂.",
+        "A⁺ : boucle ε de la sortie vers l'entrée.",
+        "A* : comme A⁺ + chemin ε qui saute A (accepte ε).",
+      ],
+    },
+    {
+      title: "Grammaires (TD4)",
+      color: palette.teal,
+      items: [
+        "S → aSb | ε  engendre  {aⁿbⁿ}.",
+        "Pour {a²ⁿbcⁿ³…} : reproduire la symétrie dans la règle.",
+        "ε termine toujours la dérivation.",
+      ],
+    },
+  ];
+
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 16 }}>
+      {blocks.map((b, idx) => (
+        <div key={idx} style={{ background: palette.cream, border: `2px solid ${palette.ink}`, borderRadius: 14, padding: 20, position: "relative", overflow: "hidden" }}>
+          <div style={{ position: "absolute", top: 0, left: 0, width: 8, height: "100%", background: b.color }} />
+          <div style={{ fontFamily: "'Fraunces', serif", fontSize: 19, fontWeight: 700, marginBottom: 12, color: palette.ink, paddingLeft: 6 }}>
+            {b.title}
+          </div>
+          <ul style={{ margin: 0, paddingLeft: 22 }}>
+            {b.items.map((it, j) => (
+              <li key={j} style={{ fontFamily: "'Outfit'", fontSize: 15, lineHeight: 1.5, marginBottom: 8, color: palette.ink }}>{it}</li>
+            ))}
+          </ul>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ============================================================
+// SHARED STYLES
+// ============================================================
+const chipStyle = {
+  padding: "8px 14px", borderRadius: 999, border: "2px solid",
+  fontFamily: "'Outfit', sans-serif", fontSize: 14, fontWeight: 500, cursor: "pointer",
+  transition: "all .18s",
+};
+const navBtn = {
+  padding: "11px 22px", borderRadius: 999, border: `2px solid ${palette.ink}`,
+  background: "transparent", color: palette.ink, fontFamily: "'Outfit', sans-serif",
+  fontSize: 15, fontWeight: 600, cursor: "pointer", transition: "all .18s",
+};
+const cardFace = {
+  position: "absolute", inset: 0, backfaceVisibility: "hidden",
+  borderRadius: 18, padding: "34px 32px", display: "flex", flexDirection: "column",
+  justifyContent: "center", boxShadow: "0 18px 40px -20px rgba(26,22,37,.45)",
+};
+const faceTag = {
+  position: "absolute", top: 18, left: 22, fontFamily: "'Space Mono', monospace",
+  fontSize: 11, textTransform: "uppercase", letterSpacing: 2, color: palette.rust,
+  border: `1px solid ${palette.rust}`, borderRadius: 999, padding: "3px 10px",
+};
+const faceHint = {
+  position: "absolute", bottom: 18, right: 22, fontFamily: "'Space Mono', monospace",
+  fontSize: 11, color: palette.line,
+};
+
+// ============================================================
+// MAIN APP
+// ============================================================
+function App() {
+  const [tab, setTab] = useState("cards");
+
+  return (
+    <div style={{ minHeight: "100vh", background: palette.paper, color: palette.ink, fontFamily: "'Outfit', sans-serif" }}>
+      <style>{`
+        @import url('${FONT_IMPORT}');
+        @keyframes fadein { from { opacity: 0; transform: translateY(6px);} to {opacity:1; transform:none;} }
+        * { box-sizing: border-box; }
+        button:hover { filter: brightness(.96); }
+        ::selection { background: ${palette.gold}; }
+      `}</style>
+
+      {/* HEADER */}
+      <header style={{
+        borderBottom: `2px solid ${palette.ink}`,
+        padding: "26px 20px 0",
+        backgroundImage: `radial-gradient(${palette.line} 1px, transparent 1px)`,
+        backgroundSize: "22px 22px",
+      }}>
+        <div style={{ maxWidth: 920, margin: "0 auto" }}>
+          <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, letterSpacing: 3, textTransform: "uppercase", color: palette.rust }}>
+            IUT Nancy-Charlemagne · Révision DS
+          </div>
+          <h1 style={{ fontFamily: "'Fraunces', serif", fontWeight: 900, fontSize: "clamp(34px, 6vw, 60px)", margin: "6px 0 4px", lineHeight: 0.98, letterSpacing: -1 }}>
+            Automates <span style={{ color: palette.rust }}>&</span> Langages
+          </h1>
+          <p style={{ fontFamily: "'Outfit'", fontSize: 16, color: palette.plum, margin: "0 0 22px", maxWidth: 560 }}>
+            Flashcards, quiz et exercices guidés. TD 1 à 4 — sans le lemme de l'étoile.
+          </p>
+
+          {/* TABS */}
+          <nav style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+            {TABS.map((t) => (
+              <button
+                key={t.id}
+                onClick={() => setTab(t.id)}
+                style={{
+                  padding: "10px 16px", border: `2px solid ${palette.ink}`,
+                  borderBottom: tab === t.id ? `2px solid ${palette.paper}` : `2px solid ${palette.ink}`,
+                  borderRadius: "10px 10px 0 0",
+                  background: tab === t.id ? palette.paper : palette.ink,
+                  color: tab === t.id ? palette.ink : palette.cream,
+                  fontFamily: "'Outfit', sans-serif", fontWeight: 600, fontSize: 14,
+                  cursor: "pointer", marginBottom: -2, position: "relative",
+                  transition: "all .15s",
+                }}
+              >
+                {t.label}
+              </button>
+            ))}
+          </nav>
+        </div>
+      </header>
+
+      {/* CONTENT */}
+      <main style={{ maxWidth: 920, margin: "0 auto", padding: "36px 20px 80px" }}>
+        {tab === "cards" && <Flashcards />}
+        {tab === "quiz" && <Quiz />}
+        {tab === "sim" && <WordSim />}
+        {tab === "determ" && <StepExercise data={DETERM_EX} kind="determ" />}
+        {tab === "arden" && <StepExercise data={ARDEN_EX} kind="arden" />}
+        {tab === "memo" && <Memo />}
+      </main>
+
+      <footer style={{ borderTop: `2px solid ${palette.ink}`, padding: "18px 20px", textAlign: "center", fontFamily: "'Space Mono', monospace", fontSize: 12, color: palette.plum }}>
+        Bon courage pour le DS, Louis 🍀 — révise un onglet à la fois.
+      </footer>
+    </div>
+  );
+}
+
+
+const container = document.getElementById('root');
+const root = ReactDOM.createRoot(container);
+root.render(<App />);
+</script>
+</body>
+</html>
